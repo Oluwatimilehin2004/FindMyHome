@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { View } from 'react-native';
+import { useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, UIManager, View } from 'react-native';
 
 import {
   DEPOSIT_LABELS,
@@ -26,6 +27,10 @@ import type { ReviewRecord, YesNoNa } from '@/lib/types';
 import { colors, radius, space } from '@/theme';
 
 import { Badge, Card, Divider, Overline, T } from './ui';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const TONE_COLOR: Record<AnswerTone, string> = {
   ok: colors.ok,
@@ -85,47 +90,64 @@ function Notes({ text }: { text: string | null | undefined }) {
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+/** Section heading with its key answer, followed by the detail lines. */
+function Section({
+  title,
+  summary,
+  tone,
+  children,
+}: {
+  title: string;
+  summary: string;
+  tone: AnswerTone;
+  children: React.ReactNode;
+}) {
   return (
-    <View style={{ gap: space.xs }}>
+    <View style={{ paddingVertical: space.sm, gap: 2 }}>
       <Overline>{title}</Overline>
-      {children}
+      <T size={13} weight="medium" color={TONE_COLOR[tone]}>
+        {summary}
+      </T>
+      <View style={{ gap: 2, marginTop: 2 }}>{children}</View>
     </View>
   );
 }
 
 /**
  * Reusable display of a structured review (FR 3.2, SRS §5.4 reusability).
- * Used on the property page, in My reviews and in the verification screen.
+ * Each section shows its key answer first, then the details.
  * Answers missing from older reviews are skipped rather than shown as blanks.
  */
 export function ReviewRecordView({ review }: { review: ReviewRecord }) {
   const landlord = (Object.keys(LANDLORD_STATEMENTS) as LandlordKey[]).filter((k) => review[k]);
+  const answered = landlord.filter((k) => review[k] !== 'na');
+  const positive = answered.filter((k) => review[k] === 'yes').length;
   const issues = (review.listing_issues ?? []).map((i) => LISTING_ISSUE_LABELS[i]);
   const hasArea = review.area_safety || review.area_noise || review.area_utilities || review.neighborhood_notes;
 
+  const landlordTone: AnswerTone =
+    !answered.length ? 'neutral' : positive === answered.length ? 'ok' : positive === 0 ? 'danger' : 'warn';
+  const areaTone: AnswerTone = review.area_safety ? SAFETY_TONE[review.area_safety] : 'neutral';
+
   return (
-    <View style={{ gap: space.md }}>
-      <Block title={SECTION_TITLES.listing}>
-        {review.listing_accuracy ? (
-          <AnswerLine
-            label="Compared with the listing"
-            value={LISTING_ACCURACY_LABELS[review.listing_accuracy]}
-            tone={LISTING_ACCURACY_TONE[review.listing_accuracy]}
-          />
-        ) : null}
+    <View>
+      <Section
+        title={SECTION_TITLES.listing}
+        summary={review.listing_accuracy ? LISTING_ACCURACY_LABELS[review.listing_accuracy] : 'Details'}
+        tone={review.listing_accuracy ? LISTING_ACCURACY_TONE[review.listing_accuracy] : 'neutral'}
+      >
         {issues.length ? <AnswerLine label="Aspects that differed" value={issues.join(', ')} tone="neutral" /> : null}
         <Notes text={review.matched_promise_notes} />
-      </Block>
+
+      </Section>
 
       <Divider />
 
-      <Block title={SECTION_TITLES.deposit}>
-        <AnswerLine
-          label="Outcome"
-          value={DEPOSIT_LABELS[review.deposit_outcome]}
-          tone={DEPOSIT_TONE[review.deposit_outcome]}
-        />
+      <Section
+        title={SECTION_TITLES.deposit}
+        summary={DEPOSIT_LABELS[review.deposit_outcome]}
+        tone={DEPOSIT_TONE[review.deposit_outcome]}
+      >
         {review.deposit_reason_given != null ? (
           <AnswerLine
             label="Written reason for deduction"
@@ -141,24 +163,33 @@ export function ReviewRecordView({ review }: { review: ReviewRecord }) {
           />
         ) : null}
         <Notes text={review.deposit_notes} />
-      </Block>
+
+      </Section>
 
       {landlord.length || review.landlord_notes ? (
         <>
           <Divider />
-          <Block title={SECTION_TITLES.landlord}>
+          <Section
+            title={SECTION_TITLES.landlord}
+            summary={answered.length ? `${positive} of ${answered.length} statements positive` : 'Details'}
+            tone={landlordTone}
+              >
             {landlord.map((k) => (
               <YesNoLine key={k} label={LANDLORD_STATEMENTS[k]} value={review[k]!} />
             ))}
             <Notes text={review.landlord_notes} />
-          </Block>
+          </Section>
         </>
       ) : null}
 
       {hasArea ? (
         <>
           <Divider />
-          <Block title={SECTION_TITLES.area}>
+          <Section
+            title={SECTION_TITLES.area}
+            summary={review.area_safety ? SAFETY_LABELS[review.area_safety] : 'Details'}
+            tone={areaTone}
+              >
             {review.area_safety ? (
               <AnswerLine label="Safety" value={SAFETY_LABELS[review.area_safety]} tone={SAFETY_TONE[review.area_safety]} />
             ) : null}
@@ -173,17 +204,21 @@ export function ReviewRecordView({ review }: { review: ReviewRecord }) {
               />
             ) : null}
             <Notes text={review.neighborhood_notes} />
-          </Block>
+          </Section>
         </>
       ) : null}
 
       {review.overall_comment ? (
-        <View style={{ backgroundColor: colors.field, borderRadius: radius.md, padding: space.md, gap: 4 }}>
-          <Overline>Additional information</Overline>
-          <T size={13} style={{ lineHeight: 20 }}>
-            {review.overall_comment}
-          </T>
-        </View>
+        <>
+          <Divider />
+          <Section title="Additional information" summary="Note from the reviewer" tone="neutral">
+            <View style={{ backgroundColor: colors.field, borderRadius: radius.md, padding: space.md }}>
+              <T size={13} style={{ lineHeight: 20 }}>
+                {review.overall_comment}
+              </T>
+            </View>
+          </Section>
+        </>
       ) : null}
     </View>
   );
@@ -196,12 +231,55 @@ export function RecommendationBadge({ value }: { value: ReviewRecord['recommenda
   return <Badge label={RECOMMENDATION_LABELS[value]} tone={tone === 'neutral' ? 'neutral' : tone} />;
 }
 
-/** Public review card with a dark accent bar (reference: task cards). */
-export function ReviewCard({ review, header }: { review: ReviewRecord; header?: React.ReactNode }) {
+/** One-line overview used when a review card is collapsed. */
+function summaryLine(review: ReviewRecord): string {
+  const parts: string[] = [];
+  if (review.listing_accuracy) parts.push(LISTING_ACCURACY_LABELS[review.listing_accuracy]);
+  parts.push(`Deposit: ${DEPOSIT_LABELS[review.deposit_outcome].toLowerCase()}`);
+  if (review.area_safety) parts.push(SAFETY_LABELS[review.area_safety]);
+  return parts.join(' · ');
+}
+
+/**
+ * Public review card with a dark accent bar (reference: task cards).
+ * Collapsed by default: the header and a one-line overview; the full review opens on demand.
+ */
+export function ReviewCard({
+  review,
+  header,
+  defaultOpen,
+}: {
+  review: ReviewRecord;
+  header?: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen((o) => !o);
+  };
   return (
-    <Card accent style={{ gap: space.md }}>
+    <Card accent style={{ gap: space.sm }}>
       {header}
-      <ReviewRecordView review={review} />
+      {open ? (
+        <ReviewRecordView review={review} />
+      ) : (
+        <T size={13} color={colors.muted} numberOfLines={2}>
+          {summaryLine(review)}
+        </T>
+      )}
+      <Pressable
+        onPress={toggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        hitSlop={6}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}
+      >
+        <T size={13} weight="medium">
+          {open ? 'Show less' : 'Read full review'}
+        </T>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text} />
+      </Pressable>
     </Card>
   );
 }

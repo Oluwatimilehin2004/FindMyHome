@@ -19,6 +19,7 @@ import {
   Loading,
   Overline,
   PageTitle,
+  RoleBadge,
   SegmentTabs,
   T,
   type Tone,
@@ -153,7 +154,7 @@ function SubmissionCard({ review, open, onToggle }: { review: MyReview; open: bo
 
 // Use case "Track review status" / sequence diagram step 7.
 export default function MyReviewsScreen() {
-  const { session, profile, signOut } = useAuth();
+  const { session, profile, signOut, isAdmin } = useAuth();
   const [reviews, setReviews] = useState<MyReview[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -260,11 +261,14 @@ export default function MyReviewsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <T weight="semibold" numberOfLines={1}>
-                {profile?.full_name || 'Student'}
+                {profile?.full_name || (isAdmin ? 'Administrator' : 'Student')}
               </T>
               <T size={12} color={colors.muted} numberOfLines={1}>
                 {session.user.email}
               </T>
+              <View style={{ marginTop: 6 }}>
+                <RoleBadge admin={isAdmin} />
+              </View>
             </View>
           </View>
           <Divider />

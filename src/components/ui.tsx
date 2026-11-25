@@ -76,7 +76,17 @@ export function TopBar({ title, right, onBack }: { title: string; right?: ReactN
 }
 
 /** Large left-aligned page title with optional actions (reference: "Welcome, Salung"). */
-export function PageTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+export function PageTitle({
+  title,
+  subtitle,
+  right,
+  badge,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  badge?: ReactNode;
+}) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
       <View style={{ flex: 1, gap: 2 }}>
@@ -88,6 +98,7 @@ export function PageTitle({ title, subtitle, right }: { title: string; subtitle?
             {subtitle}
           </T>
         ) : null}
+        {badge ? <View style={{ marginTop: 4 }}>{badge}</View> : null}
       </View>
       {right ? <View style={{ flexDirection: 'row', gap: space.sm }}>{right}</View> : null}
     </View>
@@ -589,6 +600,15 @@ export function Badge({ label, tone, icon }: { label: string; tone: Tone; icon?:
         {label}
       </T>
     </View>
+  );
+}
+
+/** Account type: administrators (FindMyHome team) are clearly distinguished from students. */
+export function RoleBadge({ admin }: { admin: boolean }) {
+  return admin ? (
+    <Badge label="Administrator" tone="dark" icon="shield-checkmark" />
+  ) : (
+    <Badge label="Student account" tone="neutral" icon="person-outline" />
   );
 }
 

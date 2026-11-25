@@ -14,6 +14,7 @@ import {
   IconButton,
   Loading,
   PageTitle,
+  RoleBadge,
   SearchBar,
   SectionTitle,
   SegmentTabs,
@@ -74,7 +75,7 @@ function BlockGraphic() {
 
 // FR 2.1 / FR 2.2 — search by name, address or neighbourhood and list results.
 export default function ExploreScreen() {
-  const { session, profile } = useAuth();
+  const { session, profile, isAdmin } = useAuth();
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('reviewed');
   const [results, setResults] = useState<PropertySummary[]>([]);
@@ -118,6 +119,7 @@ export default function ExploreScreen() {
             <PageTitle
               title={firstName ? `Welcome, ${firstName}` : 'FindMyHome'}
               subtitle="Verified tenant reviews · Kigali"
+              badge={isAdmin ? <RoleBadge admin /> : undefined}
               right={
                 <>
                   <HelpButton />
